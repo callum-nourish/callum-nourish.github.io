@@ -43,6 +43,11 @@ jobs:
       - name: Build Quartz
         run: npx quartz build
 
+      - name: Password protect site
+        env:
+          STATICRYPT_PASSWORD: ${{ secrets.STATICRYPT_PASSWORD }}
+        run: npx staticrypt public --recursive --password "$STATICRYPT_PASSWORD" --directory public
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
