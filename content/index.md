@@ -1,7 +1,5 @@
 ---
 title: Engineering
-tags:
-  - home
 aliases:
   - home
 ---

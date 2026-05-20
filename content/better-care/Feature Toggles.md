@@ -1,7 +1,7 @@
 ---
 title: Feature Toggles
 tags:
-  - reference
+  - references
 ---
 
 [[Better Care]] uses a Ruby feature toggle system. Toggles are defined with `ft` and exposed to the frontend via `window.featureToggle`.

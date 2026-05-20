@@ -1,7 +1,7 @@
 ---
 title: Parameters
 tags:
-  - reference
+  - references
 ---
 
 A [[Service Hierarchy|Service]] can have zero or more parameters. Parameters are the fields shown to a carer when they open an interaction — they are how data is gathered and stored.

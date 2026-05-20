@@ -1,7 +1,7 @@
 ---
 title: Deployment - Failures
 tags:
-  - process
+  - processes
 ---
 
 Use when a [[Deployment]] step fails. Start with the [[Semaphore]] logs for the failed run.

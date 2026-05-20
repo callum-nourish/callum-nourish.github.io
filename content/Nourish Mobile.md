@@ -1,7 +1,7 @@
 ---
 title: Nourish Mobile
 tags:
-  - product
+  - products
 ---
 
 Offline-first mobile app for carers. Preloads data on startup and syncs changes back via a Sidekiq job through `nourish-organisations` when connectivity is restored.

@@ -1,7 +1,7 @@
 ---
 title: Configuration
 tags:
-  - reference
+  - references
 ---
 
 [[Better Care]] uses a central `Configuration` model for storing JSON config on records. Direct writes are banned by a custom RuboCop cop — use the safe API instead.

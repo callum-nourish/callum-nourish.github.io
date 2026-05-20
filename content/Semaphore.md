@@ -1,7 +1,7 @@
 ---
 title: Semaphore
 tags:
-  - tool
+  - tools
 ---
 
 CI/CD platform used to run [[Better Care]] deployments and tests.

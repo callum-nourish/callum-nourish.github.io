@@ -1,7 +1,7 @@
 ---
 title: Packaging ParameterList for Nourish Studio
 tags:
-  - reference
+  - decisions
 ---
 
 Shipping a private npm package exporting a render-only `ParameterList` for use by [[Nourish Studio]]'s interaction builder preview. Studio supplies the parameters to display; the package only renders them.

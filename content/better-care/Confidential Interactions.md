@@ -1,7 +1,7 @@
 ---
 title: Confidential Interactions
 tags:
-  - reference
+  - references
 ---
 
 Any interaction can be marked confidential via a `confidential` boolean. Access is then restricted by role.
