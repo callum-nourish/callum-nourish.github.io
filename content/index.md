@@ -10,7 +10,7 @@ aliases:
 
 # Nourish Engineering Docs
 
-Welcome to the Nourish engineering knowledge base. This site is the single source of truth for architecture decisions, data models, runbooks, and API references across all Nourish codebases.
+This site is a demo of a documentation approach built on **plain Markdown, Obsidian, and Quartz** — the case for why this is the right foundation for engineering docs at Nourish. [[Why This Approach|Read the pitch →]]
 
 > [!info] How to navigate
 > Use the **search bar** (top right) to find any note by title or alias. The **graph view** shows how codebases relate to one another. Each codebase lives in its own section below.
