@@ -48,8 +48,18 @@ jobs:
           STATICRYPT_PASSWORD: ${{ secrets.STATICRYPT_PASSWORD }}
         run: |
           npm install -g staticrypt
-          find public -name "*.html" | while IFS= read -r file; do
-            staticrypt "$file" --password "$STATICRYPT_PASSWORD" --directory "$(dirname "$file")" --short
+          # One shared salt per build — all pages must use the same salt so
+          # the localStorage token from page 1 is valid on page 2+
+          STATICRYPT_SALT=$(openssl rand -hex 16)
+          # --remember 0.5 = 12 hours before re-prompting
+          readarray -d '' HTML_FILES < <(find public -name "*.html" -print0)
+          for file in "${HTML_FILES[@]}"; do
+            staticrypt "$file" \
+              --password "$STATICRYPT_PASSWORD" \
+              --salt "$STATICRYPT_SALT" \
+              --directory "$(dirname "$file")" \
+              --remember 0.5 \
+              --short
           done
 
       - name: Upload Pages artifact
