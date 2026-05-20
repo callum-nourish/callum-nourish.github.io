@@ -1,7 +1,6 @@
 ---
 title: Service Hierarchy
-tags:
-  - references
+categories: references
 ---
 
 Interactions in [[Better Care]] follow a 4-level inheritance chain. Each level can customise what the level above defined, within the bounds it allows.

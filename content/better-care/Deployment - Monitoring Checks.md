@@ -1,7 +1,6 @@
 ---
 title: Deployment - Monitoring Checks
-tags:
-  - processes
+categories: processes
 ---
 
 Run after each stage of [[Deployment]] and after a [[Hotfix]].

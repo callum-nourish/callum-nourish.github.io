@@ -1,7 +1,6 @@
 ---
 title: Adding Interactions
-tags:
-  - references
+categories: references
 ---
 
 How the + button works and why interactions appear or don't on the timeline. Part of [[Better Care]].

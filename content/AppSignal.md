@@ -1,7 +1,6 @@
 ---
 title: AppSignal
-tags:
-  - tools
+categories: tools
 ---
 
 Error monitoring and performance platform. Used during every [[Deployment]] stage to watch for error spikes, `5xx` codes, and slow requests.

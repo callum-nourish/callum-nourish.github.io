@@ -1,7 +1,6 @@
 ---
 title: Fixing N+1s
-tags:
-  - references
+categories: references
 ---
 
 An N+1 is when ActiveRecord queries the database once per record instead of once for the whole collection.

@@ -1,7 +1,6 @@
 ---
 title: Pulse
-tags:
-  - products
+categories: products
 ---
 
 Shared Vue component library. Consumed by [[Better Care]] and [[Nourish Studio]].

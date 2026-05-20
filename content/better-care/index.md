@@ -1,9 +1,8 @@
 ---
 title: Better Care
+categories: products
 aliases:
   - Nourish Organisations
-tags:
-  - products
 ---
 
 Rails and Vue web app for care recording. ~350,000 support staff use it daily. Source repo: `nourish-organisations`.

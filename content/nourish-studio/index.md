@@ -1,7 +1,6 @@
 ---
 title: Nourish Studio
-tags:
-  - products
+categories: products
 ---
 
 Vue and Vite app for configuring care interactions. Operators use Studio to build the interaction templates that [[Better Care]] surfaces to carers.
