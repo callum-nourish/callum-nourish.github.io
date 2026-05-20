@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nourish Engineering Docs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #ffffff;
+      color: #1a2332;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .logo svg { width: 32px; height: 32px; }
+
+    .logo-text {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #1a2332;
+      letter-spacing: -0.01em;
+    }
+
+    h1 {
+      font-size: 1.375rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.375rem;
+      color: #1a2332;
+    }
+
+    .subtitle {
+      font-size: 0.875rem;
+      color: #8896a0;
+      margin-bottom: 2rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: #3d4852;
+      margin-bottom: 0.375rem;
+    }
+
+    input[type="password"] {
+      width: 100%;
+      padding: 0.625rem 0.875rem;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      color: #1a2332;
+      background: #ffffff;
+      border: 1.5px solid #eef1f4;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="password"]:focus {
+      border-color: #2cc4a8;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 1rem;
+      padding: 0.6875rem 1rem;
+      font-family: inherit;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      color: #ffffff;
+      background: #2cc4a8;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button:hover { background: #26b096; }
+    button:active { background: #21a088; }
+
+    .error {
+      display: none;
+      margin-top: 0.875rem;
+      padding: 0.625rem 0.875rem;
+      background: #fff0f0;
+      border: 1.5px solid #ffd0d0;
+      border-radius: 8px;
+      font-size: 0.8125rem;
+      color: #c0392b;
+    }
+
+    .divider {
+      width: 40px;
+      height: 3px;
+      background: #2cc4a8;
+      border-radius: 2px;
+      margin-bottom: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <!-- Nourish asterisk/snowflake mark -->
+      <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M16 4v24M4 16h24M7.03 7.03l17.94 17.94M24.97 7.03 7.03 24.97" stroke="#2cc4a8" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+      <span class="logo-text">nourish</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <h1>Engineering Docs</h1>
+    <p class="subtitle">Internal access only — enter your password to continue.</p>
+
+    <label for="password">Password</label>
+    <input type="password" id="password" placeholder="Enter password" autocomplete="current-password" />
+
+    <button id="submit">Continue →</button>
+
+    <div class="error" id="error">Incorrect password. Please try again.</div>
+  </div>
+
+  <script>
+    var HASH = "PASSWORD_HASH_PLACEHOLDER";
+    var SALT = "nourish-docs-2026";
+    var AUTH_KEY = "nourish_auth_expiry";
+    var EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours
+
+    async function sha256(message) {
+      var encoded = new TextEncoder().encode(message);
+      var hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+      return Array.from(new Uint8Array(hashBuffer))
+        .map(function(b) { return b.toString(16).padStart(2, "0"); })
+        .join("");
+    }
+
+    async function attempt() {
+      var password = document.getElementById("password").value;
+      if (!password) return;
+
+      var hash = await sha256(password + SALT);
+
+      if (hash === HASH) {
+        localStorage.setItem(AUTH_KEY, String(Date.now() + EXPIRY_MS));
+        var params = new URLSearchParams(window.location.search);
+        var returnTo = params.get("return") || "/";
+        window.location.replace(returnTo);
+      } else {
+        var err = document.getElementById("error");
+        err.style.display = "block";
+        document.getElementById("password").value = "";
+        document.getElementById("password").focus();
+      }
+    }
+
+    document.getElementById("submit").addEventListener("click", attempt);
+    document.getElementById("password").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") attempt();
+    });
+  </script>
+</body>
+</html>

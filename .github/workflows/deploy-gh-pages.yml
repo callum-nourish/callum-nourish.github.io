@@ -43,24 +43,14 @@ jobs:
       - name: Build Quartz
         run: npx quartz build
 
-      - name: Password protect site
+      - name: Inject password hash into auth scripts
         env:
-          STATICRYPT_PASSWORD: ${{ secrets.STATICRYPT_PASSWORD }}
+          SITE_PASSWORD: ${{ secrets.STATICRYPT_PASSWORD }}
         run: |
-          npm install -g staticrypt
-          # One shared salt per build — all pages must use the same salt so
-          # the localStorage token from page 1 is valid on page 2+
-          STATICRYPT_SALT=$(openssl rand -hex 16)
-          # --remember 0.5 = 12 hours before re-prompting
-          readarray -d '' HTML_FILES < <(find public -name "*.html" -print0)
-          for file in "${HTML_FILES[@]}"; do
-            staticrypt "$file" \
-              --password "$STATICRYPT_PASSWORD" \
-              --salt "$STATICRYPT_SALT" \
-              --directory "$(dirname "$file")" \
-              --remember 0.5 \
-              --short
-          done
+          # Hash the password with a fixed salt using the same algorithm as the browser
+          HASH=$(echo -n "${SITE_PASSWORD}nourish-docs-2026" | sha256sum | cut -d' ' -f1)
+          sed -i "s/PASSWORD_HASH_PLACEHOLDER/${HASH}/g" public/static/auth.js
+          sed -i "s/PASSWORD_HASH_PLACEHOLDER/${HASH}/g" public/static/login.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
