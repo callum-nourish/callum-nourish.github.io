@@ -51,6 +51,9 @@ jobs:
       - name: Build Quartz
         run: npx quartz build
 
+      - name: Disable Jekyll processing
+        run: touch public/.nojekyll
+
       - name: Inject password hash into auth scripts
         env:
           SITE_PASSWORD: ${{ secrets.STATICRYPT_PASSWORD }}
