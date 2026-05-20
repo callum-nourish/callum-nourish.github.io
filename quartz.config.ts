@@ -23,32 +23,32 @@ const config: QuartzConfig = {
       fontOrigin: "googleFonts",
       cdnCaching: true,
       typography: {
-        header: "Schibsted Grotesk",
-        body: "Source Sans Pro",
-        code: "IBM Plex Mono",
+        header: "Inter",
+        body: "Inter",
+        code: "JetBrains Mono",
       },
       colors: {
         lightMode: {
-          light: "#faf8f8",
-          lightgray: "#e5e5e5",
-          gray: "#b8b8b8",
-          darkgray: "#4e4e4e",
-          dark: "#2b2b2b",
-          secondary: "#284b63",
-          tertiary: "#84a59d",
-          highlight: "rgba(143, 159, 169, 0.15)",
-          textHighlight: "#fff23688",
+          light: "#ffffff",          // page background — pure white
+          lightgray: "#eef1f4",      // sidebar bg, borders, table stripes
+          gray: "#8896a0",           // metadata, dates, secondary text
+          darkgray: "#3d4852",       // body text
+          dark: "#1a2332",           // headings, strong text
+          secondary: "#2cc4a8",      // links, active nav — Nourish teal
+          tertiary: "#7b5abf",       // hover states — Nourish purple
+          highlight: "rgba(44, 196, 168, 0.08)",
+          textHighlight: "rgba(44, 196, 168, 0.28)",
         },
         darkMode: {
-          light: "#161618",
-          lightgray: "#393639",
-          gray: "#646464",
-          darkgray: "#d4d4d4",
-          dark: "#ebebec",
-          secondary: "#7b97aa",
-          tertiary: "#84a59d",
-          highlight: "rgba(143, 159, 169, 0.15)",
-          textHighlight: "#b3aa0288",
+          light: "#0f1923",          // page background — deep navy
+          lightgray: "#1b2d3c",      // sidebar bg, borders
+          gray: "#4a6878",           // metadata, secondary text
+          darkgray: "#b8ccd4",       // body text
+          dark: "#e4eff4",           // headings
+          secondary: "#2cc4a8",      // links — teal holds on dark
+          tertiary: "#a07ee0",       // hover — lightened purple for dark
+          highlight: "rgba(44, 196, 168, 0.1)",
+          textHighlight: "rgba(44, 196, 168, 0.22)",
         },
       },
     },
@@ -61,8 +61,8 @@ const config: QuartzConfig = {
       }),
       Plugin.SyntaxHighlighting({
         theme: {
-          light: "github-light",
-          dark: "github-dark",
+          light: "vitesse-light",
+          dark: "vitesse-dark",
         },
         keepBackground: false,
       }),
