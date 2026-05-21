@@ -39,7 +39,20 @@ export const defaultContentPageLayout: PageLayout = {
     Component.Explorer({ folderDefaultState: "collapsed" }),
   ],
   right: [
-    Component.Graph(),
+    Component.Graph({
+      localGraph: {
+        repelForce: 0.8,
+        linkDistance: 45,
+        fontSize: 0.55,
+        focusOnHover: true,
+      },
+      globalGraph: {
+        repelForce: 1.2,
+        linkDistance: 55,
+        centerForce: 0.25,
+        fontSize: 0.5,
+      },
+    }),
     Component.DesktopOnly(Component.TableOfContents()),
     Component.Backlinks(),
   ],
