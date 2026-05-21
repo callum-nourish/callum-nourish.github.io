@@ -58,7 +58,18 @@ const encoder = (str: string): string[] => {
     tokens.push(lower.slice(bufferStart))
   }
 
-  return tokens
+  // Also emit the individual segments of hyphen-separated tokens so that
+  // searching "606" matches "out-606", "deployment" matches "deployment-monitoring", etc.
+  const result = [...tokens]
+  for (const token of tokens) {
+    if (token.includes("-")) {
+      for (const part of token.split("-")) {
+        if (part.length > 0) result.push(part)
+      }
+    }
+  }
+
+  return result
 }
 
 let index = new FlexSearch.Document<Item>({
@@ -492,8 +503,11 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
     const term = currentSearchTerm.toLowerCase()
     const titleScore = (slug: FullSlug): number => {
       const title = (data[slug]?.title ?? "").toLowerCase()
-      if (title === term) return 3
-      if (title.startsWith(term)) return 2
+      if (title === term) return 4
+      if (title.startsWith(term)) return 3
+      // A hyphen-separated segment of the title starts with the term
+      // e.g. searching "606" should rank "OUT-606" above generic contains-matches
+      if (title.split(/[-\s]+/).some((seg: string) => seg.startsWith(term))) return 2
       if (title.includes(term)) return 1
       return 0
     }
