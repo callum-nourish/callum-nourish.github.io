@@ -2,7 +2,7 @@
 title: OUT-106 Demo
 created: 2025-12-16
 tags:
-  - done
+  - cards
 aliases:
   - Care plan report date range demo
 ---

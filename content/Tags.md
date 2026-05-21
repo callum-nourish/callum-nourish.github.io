@@ -21,6 +21,7 @@ Used on this site to group notes by type. Each maps to a browsable `/tags/<name>
 | `tools` | An external tool or platform — Semaphore, AppSignal, Jira |
 | `features` | A user-facing feature within a product |
 | `decisions` | A documented design or architectural decision, including open questions and rationale |
+| `cards` | A shipped work card — Jira ticket record with decisions, timeline, and outcome |
 
 ## Status Tags
 
