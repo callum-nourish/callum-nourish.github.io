@@ -11,7 +11,10 @@ clean_cards.py — post-import cleanup for Quartz card files.
    - Person-name wikilinks ([[Full Name]]) → removes them entirely
    - Vault-only note wikilinks ([[Long Note Title]]) → plain text (no brackets)
    - OUT-/BP- wikilinks that resolve to existing files → kept as-is
+   - Date wikilinks ([[YYYY-MM-DD]]) → kept as-is for graph connections
 4. Strips stray Obsidian comment blocks (%% ... %%).
+5. Wraps bare YYYY-MM-DD dates in [[...]] outside code blocks so they
+   create graph edges between cards worked on the same day.
 """
 
 import os
@@ -89,6 +92,10 @@ def replace_wikilink(m: re.Match, known_slugs: set[str]) -> str:
     if target_slug in known_slugs:
         return m.group(0)   # unchanged
 
+    # ---- Keep date wikilinks as-is — they create graph edges ---------------
+    if re.match(r'^\d{4}-\d{2}-\d{2}$', target_slug):
+        return m.group(0)   # [[YYYY-MM-DD]] unchanged
+
     # ---- Person-name links: keep display text only (or remove) -------------
     if looks_like_person_name(target):
         return display if display else ""
@@ -139,6 +146,27 @@ def remove_empty_headers(lines: list[str]) -> list[str]:
     return result
 
 # --------------------------------------------------------------------------- #
+# Date wikilink wrapping
+# --------------------------------------------------------------------------- #
+
+# Matches a bare date NOT already inside [[ ]]
+_BARE_DATE_RE = re.compile(r'(?<!\[)\b(\d{4}-\d{2}-\d{2})\b(?!\])')
+# Splits body on fenced code blocks and inline code spans
+_CODE_SPLIT_RE = re.compile(r'(```[\s\S]*?```|`[^`\n]+`)')
+
+def wrap_dates(body: str) -> str:
+    """
+    Wrap bare YYYY-MM-DD dates in [[...]] so they create graph edges.
+    Skips content inside fenced code blocks and inline code spans.
+    Already-wrapped [[YYYY-MM-DD]] dates are left unchanged.
+    """
+    segments = _CODE_SPLIT_RE.split(body)
+    # split() with a capturing group → even indices are plain text, odd are code
+    for i in range(0, len(segments), 2):
+        segments[i] = _BARE_DATE_RE.sub(r'[[\1]]', segments[i])
+    return "".join(segments)
+
+# --------------------------------------------------------------------------- #
 # Frontmatter split
 # --------------------------------------------------------------------------- #
 
@@ -178,6 +206,9 @@ def process_file(path: Path, known_slugs: set[str]) -> bool:
 
     # 5. Collapse multiple consecutive blank lines into at most two
     body = re.sub(r'\n{3,}', '\n\n', body)
+
+    # 6. Wrap bare dates in [[YYYY-MM-DD]] for graph connections
+    body = wrap_dates(body)
 
     # Reassemble
     result = fm_block + body.lstrip("\n")
