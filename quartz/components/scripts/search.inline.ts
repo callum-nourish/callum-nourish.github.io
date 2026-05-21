@@ -489,7 +489,21 @@ async function setupSearch(searchElement: Element, currentSlug: FullSlug, data: 
       ...getByField("content"),
       ...getByField("tags"),
     ])
-    const finalResults = [...allIds].map((id) => formatForDisplay(currentSearchTerm, id))
+    const term = currentSearchTerm.toLowerCase()
+    const titleScore = (slug: FullSlug): number => {
+      const title = (data[slug]?.title ?? "").toLowerCase()
+      if (title === term) return 3
+      if (title.startsWith(term)) return 2
+      if (title.includes(term)) return 1
+      return 0
+    }
+    const finalResults = [...allIds]
+      .map((id) => formatForDisplay(currentSearchTerm, id))
+      .sort((a, b) => {
+        const scoreDiff = titleScore(b.slug) - titleScore(a.slug)
+        if (scoreDiff !== 0) return scoreDiff
+        return (data[a.slug]?.title ?? "").localeCompare(data[b.slug]?.title ?? "")
+      })
     await displayResults(finalResults)
   }
 
