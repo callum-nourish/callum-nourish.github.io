@@ -8,7 +8,7 @@ Press `Ctrl+K` to search across all docs.
 
 ## Products
 
-[[Better Care]] · [[Nourish Studio]] · [[Nourish Mobile]] · [[Pulse]]
+[[Better Care]] · [[Nourish Studio]] · [[Nourish Mobile]] · [[Pulse]] · [[Data Points]]
 
 ## Topics
 
