@@ -1,0 +1,18 @@
+.palette-toggle {
+  background: none;
+  border: 1px solid var(--lightgray);
+  border-radius: 4px;
+  color: var(--gray);
+  cursor: pointer;
+  font-family: var(--bodyFont);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.45rem;
+  line-height: 1;
+  transition: border-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: var(--secondary);
+    color: var(--secondary);
+  }
+}
