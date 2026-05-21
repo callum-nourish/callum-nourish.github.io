@@ -1,6 +1,7 @@
 ---
 title: One Care Plan
-categories: references
+tags:
+  - internals
 ---
 
 1CP migrates care plans from being org-unit-specific to organisation-wide. A person supported (PWS) gets one care plan across all org units rather than one per unit.

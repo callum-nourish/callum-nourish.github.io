@@ -1,6 +1,7 @@
 ---
 title: Interaction Type State
-categories: references
+tags:
+  - internals
 ---
 
 `useInteractionTypeState` is the central hook for managing an interaction type in [[Nourish Studio]]. It wraps all CRUD against DynamoDB via the Interaction Types Lambda API.

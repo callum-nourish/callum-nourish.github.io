@@ -5,9 +5,22 @@ aliases:
   - tag bibliography
 ---
 
-Tags answer *"what state is this note in?"* — not what it's about, not what type it is. Links, `categories`, and `topics` carry meaning. Tags carry state.
+Tags answer *"what state is this note in?"* — not what it's about, not what type it is. Links and folder structure carry meaning. Tags carry state.
 
 If a tag would still be correct in a year without edits, it's probably not a tag — it belongs in a property or a backlink.
+
+## Content Tags
+
+Used on this site to group notes by type. Each maps to a browsable `/tags/<name>` page.
+
+| Tag | Meaning |
+|---|---|
+| `products` | A product or system — Better Care, Nourish Studio, Nourish Mobile, Pulse |
+| `internals` | How something works inside a codebase — models, patterns, APIs, flows |
+| `processes` | A repeatable workflow or runbook — deployment, hotfix, etc. |
+| `tools` | An external tool or platform — Semaphore, AppSignal, Jira |
+| `features` | A user-facing feature within a product |
+| `decisions` | A documented design or architectural decision, including open questions and rationale |
 
 ## Status Tags
 
@@ -48,7 +61,8 @@ Terminal tags are `#polished`, `#done`, `#archived`, `#deprecated`. Don't combin
 | Tag | Status |
 |---|---|
 | `#note` | Deprecated. Everything here is already a note. |
-| `#categories` | Deprecated. Use the `categories` property and category notes instead. |
+| `#categories` | Deprecated. Use links and folder structure instead. |
+| `#references` | Deprecated. Use `#internals` for codebase documentation; reserve "references" in your vault for notes on external sources. |
 | `#guide` | Candidate for deprecation. Link from a category note instead. |
 | `#journal` | Candidate for deprecation. Prefer `#reflection` or `#weekly`. |
 | `#meeting` | Candidate for deprecation. Prefer a `categories` value or links to people/projects. |

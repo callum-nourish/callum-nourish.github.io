@@ -1,12 +1,15 @@
 ---
 title: Better Care
-categories: products
+tags:
+  - products
 aliases:
   - Nourish Organisations
   - Better Care
 ---
 
-Rails and Vue web app for care recording. ~350,000 support staff use it daily. Source repo: `nourish-organisations`.
+Rails and Vue web app for care recording. ~350,000 support staff use it daily.
+
+[nourish-organisations](https://github.com/nourishcare/nourish-organisations) · Rails · Vue
 
 [[Custom Critical Information]] lets organisations configure their own data points. [[Pulse]] is the shared component library consumed across [[Better Care]] and [[Nourish Studio]].
 

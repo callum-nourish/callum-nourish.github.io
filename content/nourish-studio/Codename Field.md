@@ -1,6 +1,7 @@
 ---
 title: Codename Field
-categories: references
+tags:
+  - internals
 ---
 
 Every interaction type in [[Nourish Studio]] requires a codename. The `CodenameParameter` component handles input and validation via `useCodenameField`.

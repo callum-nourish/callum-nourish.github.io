@@ -1,6 +1,7 @@
 ---
 title: Hotfix
-categories: processes
+tags:
+  - processes
 ---
 
 Use for an urgent [[Better Care]] release outside the normal [[Deployment]] cadence.

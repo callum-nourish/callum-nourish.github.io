@@ -1,6 +1,7 @@
 ---
 title: Deployment - Rollback
-categories: processes
+tags:
+  - processes
 ---
 
 Use when a [[Deployment]] succeeded technically but needs to be reversed quickly.

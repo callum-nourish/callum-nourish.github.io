@@ -1,6 +1,7 @@
 ---
 title: Deployment
-categories: processes
+tags:
+  - processes
 ---
 
 Live deployment runbook for [[Better Care]]. Read top to bottom. Do not skip ahead unless a gate explicitly says you can continue.

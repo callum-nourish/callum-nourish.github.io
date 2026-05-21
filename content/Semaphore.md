@@ -1,6 +1,7 @@
 ---
 title: Semaphore
-categories: tools
+tags:
+  - tools
 ---
 
 CI/CD platform used to run [[Better Care]] deployments and tests.

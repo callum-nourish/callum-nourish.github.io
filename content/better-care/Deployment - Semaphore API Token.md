@@ -1,6 +1,7 @@
 ---
 title: Deployment - Semaphore API Token
-categories: references
+tags:
+  - internals
 ---
 
 Hard prerequisite for [[Deployment]] and [[Hotfix]]. If the token is not set, the task fails with `API token env var not set`.

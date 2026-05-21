@@ -1,6 +1,7 @@
 ---
 title: Authentication
-categories: references
+tags:
+  - internals
 ---
 
 [[Nourish Studio]] uses AWS Cognito for auth, managed through `useSessionStore`.
