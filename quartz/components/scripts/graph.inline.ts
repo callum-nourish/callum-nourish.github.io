@@ -193,8 +193,6 @@ async function renderGraph(graph: HTMLElement, fullSlug: FullSlug) {
     {} as Record<(typeof cssVars)[number], string>,
   )
 
-  const isDateNode = (id: string) => /^\d{4}-\d{2}-\d{2}$/.test(id)
-
   // calculate color
   const color = (d: NodeData) => {
     const isCurrent = d.id === slug
@@ -208,6 +206,10 @@ async function renderGraph(graph: HTMLElement, fullSlug: FullSlug) {
     } else {
       return computedStyleMap["--gray"]
     }
+  }
+
+  function isDateNode(id: string) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(id)
   }
 
   function nodeRadius(d: NodeData) {
