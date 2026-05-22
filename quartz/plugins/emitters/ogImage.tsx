@@ -55,7 +55,12 @@ async function generateSocialImage(
     fonts,
     loadAdditionalAsset: async (languageCode: string, segment: string) => {
       if (languageCode === "emoji") {
-        return await loadEmoji(getIconCode(segment))
+        try {
+          return await loadEmoji(getIconCode(segment))
+        } catch {
+          // Codepoint not in emoji map — skip image, let Satori fall back to text
+          return languageCode
+        }
       }
 
       return languageCode

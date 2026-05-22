@@ -2,9 +2,11 @@
 /**
  * sync-confluence.mjs — fetch all Confluence spaces at build time.
  *
- * Writes pages to content/confluence/{space-key}/
+ * Directory structure mirrors the Confluence page hierarchy:
+ *   content/confluence/{space-key}/{parent-slug}/{child-slug}/index.md
+ *
  * Writes a sync-status index to content/confluence/index.md
- * Removes files for pages deleted from Confluence.
+ * Removes files/dirs for pages deleted or moved in Confluence.
  * Idempotent — safe to run multiple times.
  *
  * Required env vars:
@@ -18,8 +20,7 @@
  *                               (defaults to personal / utility spaces)
  */
 
-import { readdir, rm, mkdir, writeFile, readFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { readdir, rm, mkdir, writeFile, readFile, stat } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -86,18 +87,14 @@ function pageUrl(spaceKey, pageId) {
 async function fetchAllSpaces() {
   const spaces = []
   let cursor = null
-
   do {
     const params = { limit: 50, type: 'global', status: 'current' }
     if (cursor) params.cursor = cursor
-
     const data = await cfetch('/spaces', params)
     spaces.push(...(data.results ?? []))
-
     const next = data._links?.next
     cursor = next ? new URL(next, 'https://x').searchParams.get('cursor') : null
   } while (cursor)
-
   return spaces
 }
 
@@ -106,18 +103,14 @@ async function fetchAllSpaces() {
 async function fetchAllPages(spaceId) {
   const pages = []
   let cursor = null
-
   do {
     const params = { limit: 50, status: 'current' }
     if (cursor) params.cursor = cursor
-
     const data = await cfetch(`/spaces/${spaceId}/pages`, params)
     pages.push(...(data.results ?? []))
-
     const next = data._links?.next
     cursor = next ? new URL(next, 'https://x').searchParams.get('cursor') : null
   } while (cursor)
-
   return pages
 }
 
@@ -136,6 +129,70 @@ async function fetchPageBody(pageId) {
     lastModified: data.version?.createdAt ?? data.createdAt ?? null,
     status: data.status ?? 'current',
   }
+}
+
+// ── Hierarchy: build a path map mirroring Confluence structure ─────────────────
+//
+// Each page is written as {spaceDir}/{ancestor-slug}/{slug}/index.md so the
+// filesystem tree matches what you see in the Confluence sidebar.
+
+function slugify(title) {
+  return (
+    title
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+    || 'untitled'
+  )
+}
+
+/**
+ * Build a Map<pageId, relativePath> where relativePath uses the full ancestor
+ * chain, e.g. "product/discovery/user-research".
+ * Sibling slug collisions get the page ID appended.
+ */
+function buildPathMap(pages) {
+  const pageIds = new Set(pages.map((p) => String(p.id)))
+
+  // Group children by parentId (only within the current space's page set)
+  const children = new Map() // parentId → Page[]
+  const roots = []
+
+  for (const page of pages) {
+    const pid = page.parentId ? String(page.parentId) : null
+    if (pid && pageIds.has(pid)) {
+      if (!children.has(pid)) children.set(pid, [])
+      children.get(pid).push(page)
+    } else {
+      roots.push(page)
+    }
+  }
+
+  const pathMap = new Map() // pageId → relative path string
+
+  function assignPaths(siblings, prefix) {
+    // Deduplicate slugs among siblings
+    const baseSlugs = siblings.map((p) => slugify(p.title) || `page-${p.id}`)
+    const counts = {}
+    for (const s of baseSlugs) counts[s] = (counts[s] ?? 0) + 1
+
+    siblings.forEach((page, i) => {
+      const base = baseSlugs[i]
+      const slug = counts[base] > 1 ? `${base}-${page.id}` : base
+      const path = prefix ? `${prefix}/${slug}` : slug
+      pathMap.set(String(page.id), path)
+
+      const kids = children.get(String(page.id)) ?? []
+      if (kids.length) assignPaths(kids, path)
+    })
+  }
+
+  assignPaths(roots, '')
+  return pathMap
 }
 
 // ── ADF → Markdown ────────────────────────────────────────────────────────────
@@ -192,7 +249,7 @@ function adfToMarkdown(node, ctx = { listDepth: 0 }) {
       const marker = ctx.marker ?? '- '
       const childCtx = { ...ctx, marker: undefined }
       const [first, ...rest] = node.content ?? []
-      const firstLine = marker + adfToMarkdown(first, childCtx).trimStart()
+      const firstLine = marker + adfToMarkdown(first ?? { type: 'paragraph', content: [] }, childCtx).trimStart()
       const restLines = rest.map((c) => {
         const rendered = adfToMarkdown(c, childCtx)
         const indent = ' '.repeat(marker.length)
@@ -225,14 +282,12 @@ function adfToMarkdown(node, ctx = { listDepth: 0 }) {
       return rendered.join('\n') + '\n'
     }
 
-    case 'tableRow':
-      return (node.content ?? []).map((n) => adfToMarkdown(n, ctx)).join(' | ')
+    case 'tableRow':    return (node.content ?? []).map((n) => adfToMarkdown(n, ctx)).join(' | ')
     case 'tableHeader':
-    case 'tableCell':
-      return (node.content ?? []).map((n) => adfToMarkdown(n, ctx)).join('')
+    case 'tableCell':   return (node.content ?? []).map((n) => adfToMarkdown(n, ctx)).join('')
 
     case 'panel': {
-      const label = (node.attrs?.panelType ?? 'note')
+      const label = node.attrs?.panelType ?? 'note'
       const inner = joinBlocks((node.content ?? []).map((n) => adfToMarkdown(n, ctx)))
       return `> **${label.charAt(0).toUpperCase() + label.slice(1)}:** ${inner.trim()}\n`
     }
@@ -256,10 +311,9 @@ function adfToMarkdown(node, ctx = { listDepth: 0 }) {
       try { return new Date(parseInt(ts)).toISOString().slice(0, 10) } catch { return String(ts) }
     }
 
-    case 'status':   return node.attrs?.text ?? ''
-    case 'emoji':    return node.attrs?.shortName ?? node.attrs?.text ?? ''
-    case 'mention':  return '' // PII — strip all colleague name mentions
-
+    case 'status':      return node.attrs?.text ?? ''
+    case 'emoji':       return node.attrs?.shortName ?? node.attrs?.text ?? ''
+    case 'mention':     return '' // PII — strip all colleague name mentions
     case 'media':
     case 'mediaSingle':
     case 'mediaGroup':
@@ -284,29 +338,6 @@ function postProcess(md) {
   return md.replace(/\n{3,}/g, '\n\n').trim()
 }
 
-// ── Slug / dedup ──────────────────────────────────────────────────────────────
-
-function slugify(title) {
-  return (
-    title
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .replace(/[^\w\s-]/g, '')
-      .replace(/[\s_]+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
-    || 'untitled'
-  )
-}
-
-function assignSlugs(pages) {
-  const base = pages.map((p) => slugify(p.title ?? `page-${p.id}`))
-  const counts = {}
-  for (const s of base) counts[s] = (counts[s] ?? 0) + 1
-  return pages.map((p, i) => (counts[base[i]] > 1 ? `${base[i]}-${p.id}` : base[i]))
-}
-
 // ── File building ─────────────────────────────────────────────────────────────
 
 function buildPage(title, pageId, spaceKey, lastModified, mdBody) {
@@ -329,10 +360,10 @@ function buildSpaceIndex(space, pageCount, syncedAt) {
   return [
     '---',
     `title: "${space.name.replace(/"/g, '\\"')}"`,
-    `tags:`,
+    'tags:',
     `  - confluence`,
     `  - ${space.key.toLowerCase()}`,
-    `---`,
+    '---',
     '',
     `> Last synced from Confluence: **${syncedAt}**`,
     '',
@@ -362,25 +393,107 @@ function buildRootIndex(syncedAt, spaceStats) {
   ].join('\n')
 }
 
+// ── Stale file cleanup ────────────────────────────────────────────────────────
+// Recursively removes .md files not in writtenPaths, then prunes empty dirs.
+
+async function removeStale(dir, writtenPaths) {
+  let entries
+  try { entries = await readdir(dir, { withFileTypes: true }) } catch { return }
+
+  for (const entry of entries) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      await removeStale(full, writtenPaths)
+      // Prune the directory if it's now empty
+      try {
+        const remaining = await readdir(full)
+        if (!remaining.length) await rm(full)
+      } catch { /* ok */ }
+    } else if (entry.isFile() && entry.name.endsWith('.md') && !writtenPaths.has(full)) {
+      await rm(full)
+    }
+  }
+}
+
+// ── Sync issues log ───────────────────────────────────────────────────────────
+
+function buildIssuesPage(syncedAt, issues) {
+  if (!issues.length) {
+    return [
+      '---',
+      'title: "Confluence Sync Issues"',
+      'tags:',
+      '  - confluence',
+      '---',
+      '',
+      `> Last checked: **${syncedAt}**`,
+      '',
+      '✅ No issues on last sync.',
+      '',
+    ].join('\n')
+  }
+
+  const bySpace = {}
+  for (const issue of issues) {
+    if (!bySpace[issue.space]) bySpace[issue.space] = []
+    bySpace[issue.space].push(issue)
+  }
+
+  const sections = Object.entries(bySpace).map(([space, items]) => {
+    const rows = items.map(
+      (i) => `| ${i.title} | ${i.pageId} | ${i.reason} |`,
+    )
+    return [
+      `### ${space}`,
+      '',
+      '| Page title | Confluence ID | Reason |',
+      '| --- | --- | --- |',
+      ...rows,
+      '',
+    ].join('\n')
+  })
+
+  return [
+    '---',
+    'title: "Confluence Sync Issues"',
+    'tags:',
+    '  - confluence',
+    '---',
+    '',
+    `> Last checked: **${syncedAt}** — **${issues.length}** issue${issues.length !== 1 ? 's' : ''} across **${Object.keys(bySpace).length}** space${Object.keys(bySpace).length !== 1 ? 's' : ''}`,
+    '',
+    ...sections,
+  ].join('\n')
+}
+
 // ── Sync one space ────────────────────────────────────────────────────────────
 
-async function syncSpace(space, syncedAt) {
+async function syncSpace(space, syncedAt, issues) {
   const dirKey = slugify(space.key)
   const spaceDir = join(CONTENT_ROOT, dirKey)
   await mkdir(spaceDir, { recursive: true })
 
-  // Page listing
+  // 1. Fetch flat page list (includes parentId)
   const pages = await fetchAllPages(space.id)
-  const slugs = assignSlugs(pages)
-  const writtenFiles = new Set(['index.md'])
+
+  // 2. Build hierarchy-aware path map
+  const pathMap = buildPathMap(pages)
+
+  // 3. Fetch bodies and write files
+  const writtenPaths = new Set()
+  // Always keep the space index
+  writtenPaths.add(join(spaceDir, 'index.md'))
 
   let written = 0, unchanged = 0, errors = 0
 
-  for (let i = 0; i < pages.length; i++) {
-    const page = pages[i]
-    const filename = `${slugs[i]}.md`
-    writtenFiles.add(filename)
-    const filePath = join(spaceDir, filename)
+  for (const page of pages) {
+    const relPath = pathMap.get(String(page.id))
+    if (relPath === undefined) continue // shouldn't happen
+
+    // Each page is index.md inside its own slug directory
+    const pageDir = join(spaceDir, relPath)
+    const filePath = join(pageDir, 'index.md')
+    writtenPaths.add(filePath)
 
     try {
       await sleep(80)
@@ -388,8 +501,31 @@ async function syncSpace(space, syncedAt) {
 
       if (status === 'archived') continue
 
-      const mdBody = adf ? postProcess(adfToMarkdown(adf)) : ''
-      const content = buildPage(title, page.id, space.key, lastModified, mdBody)
+      let mdBody = ''
+      if (adf) {
+        try {
+          mdBody = postProcess(adfToMarkdown(adf))
+        } catch (convErr) {
+          issues.push({
+            space: space.key,
+            title: title || page.title || page.id,
+            pageId: page.id,
+            reason: `ADF conversion error: ${convErr.message}`,
+          })
+          mdBody = `> ⚠️ Content could not be converted. [View original in Confluence ↗](${pageUrl(space.key, page.id)})`
+        }
+      } else {
+        issues.push({
+          space: space.key,
+          title: page.title || page.id,
+          pageId: page.id,
+          reason: 'No ADF body returned by API (unsupported page type or empty page)',
+        })
+      }
+
+      const content = buildPage(title || page.title, page.id, space.key, lastModified, mdBody)
+
+      await mkdir(pageDir, { recursive: true })
 
       let existing = null
       try { existing = await readFile(filePath, 'utf-8') } catch { /* new */ }
@@ -401,21 +537,20 @@ async function syncSpace(space, syncedAt) {
         written++
       }
     } catch (err) {
-      console.error(`    ✗  ${page.title ?? page.id}: ${err.message}`)
+      issues.push({
+        space: space.key,
+        title: page.title || page.id,
+        pageId: page.id,
+        reason: `Fetch failed: ${err.message}`,
+      })
       errors++
     }
   }
 
-  // Remove stale files
-  let removed = 0
-  for (const file of await readdir(spaceDir)) {
-    if (file.endsWith('.md') && !writtenFiles.has(file)) {
-      await rm(join(spaceDir, file))
-      removed++
-    }
-  }
+  // 4. Remove stale files and empty directories
+  await removeStale(spaceDir, writtenPaths)
 
-  // Write space index (always refresh — contains sync timestamp)
+  // 5. Write space index (always refresh — contains sync timestamp)
   await writeFile(
     join(spaceDir, 'index.md'),
     buildSpaceIndex(space, written + unchanged, syncedAt),
@@ -424,7 +559,7 @@ async function syncSpace(space, syncedAt) {
 
   console.log(
     `  ${space.key.padEnd(16)} ${pages.length} pages — ` +
-    `${written} written, ${unchanged} unchanged, ${removed} removed` +
+    `${written} written, ${unchanged} unchanged` +
     (errors ? `, ${errors} errors` : ''),
   )
 
@@ -450,40 +585,44 @@ async function main() {
   } else {
     const excluded = spaces.filter((s) => EXCLUDE_KEYS.has(s.key.toUpperCase()))
     spaces = spaces.filter((s) => !EXCLUDE_KEYS.has(s.key.toUpperCase()))
-    if (excluded.length) {
-      console.log(`Excluded: ${excluded.map((s) => s.key).join(', ')}`)
-    }
+    if (excluded.length) console.log(`Excluded: ${excluded.map((s) => s.key).join(', ')}`)
   }
 
   console.log(`Syncing ${spaces.length} spaces:\n`)
 
   const stats = []
+  const issues = [] // shared across all spaces
   let totalErrors = 0
 
   for (const space of spaces) {
     try {
-      const result = await syncSpace(space, syncedAt)
+      const result = await syncSpace(space, syncedAt, issues)
       stats.push(result)
       totalErrors += result.errors
     } catch (err) {
       console.error(`  ✗  ${space.key}: ${err.message}`)
+      issues.push({ space: space.key, title: space.name, pageId: '—', reason: `Space sync failed: ${err.message}` })
       totalErrors++
     }
   }
 
-  // Remove directories for spaces no longer synced
+  // Remove directories for spaces no longer in the sync set
   const syncedDirKeys = new Set(stats.map((s) => s.dirKey))
   for (const entry of await readdir(CONTENT_ROOT)) {
+    if (entry === 'index.md') continue
     const full = join(CONTENT_ROOT, entry)
-    const isDir = existsSync(join(full, 'index.md'))
-    if (isDir && !syncedDirKeys.has(entry)) {
-      await rm(full, { recursive: true })
-      console.log(`  🗑  removed stale space: ${entry}`)
-    }
+    try {
+      const s = await stat(full)
+      if (s.isDirectory() && !syncedDirKeys.has(entry)) {
+        await rm(full, { recursive: true })
+        console.log(`  🗑  removed stale space dir: ${entry}`)
+      }
+    } catch { /* ok */ }
   }
 
-  // Write root index
+  // Write root index and issues log
   await writeFile(join(CONTENT_ROOT, 'index.md'), buildRootIndex(syncedAt, stats), 'utf-8')
+  await writeFile(join(CONTENT_ROOT, '_sync-issues.md'), buildIssuesPage(syncedAt, issues), 'utf-8')
 
   const totalPages = stats.reduce((n, s) => n + s.count, 0)
   console.log(`\nDone: ${totalPages} pages across ${stats.length} spaces. Synced at ${syncedAt}.`)
