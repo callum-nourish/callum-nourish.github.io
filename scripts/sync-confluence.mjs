@@ -56,6 +56,11 @@ const EXCLUDE_KEYS = process.env.CONFLUENCE_EXCLUDE_SPACES
   ? new Set(process.env.CONFLUENCE_EXCLUDE_SPACES.split(',').map((s) => s.trim().toUpperCase()))
   : DEFAULT_EXCLUDE
 
+// How many spaces to sync in parallel. Each space fetches pages sequentially
+// at ~80 ms/page, so 5 concurrent spaces ≈ 60 req/s total — well within
+// Atlassian Cloud limits. Lower if you see 429 errors.
+const CONCURRENCY = parseInt(process.env.CONFLUENCE_CONCURRENCY ?? '5', 10)
+
 const BASE_URL = `https://api.atlassian.com/ex/confluence/${CLOUD_ID}/wiki/api/v2`
 const AUTH = Buffer.from(`${EMAIL}:${TOKEN}`).toString('base64')
 
@@ -77,6 +82,21 @@ async function cfetch(path, params = {}) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+// Worker-pool concurrent mapper. Runs up to `concurrency` async tasks at once.
+// Safe in JS because i++ is atomic on the single-threaded event loop.
+async function pMap(items, fn, concurrency) {
+  const results = new Array(items.length)
+  let i = 0
+  async function worker() {
+    while (i < items.length) {
+      const idx = i++
+      results[idx] = await fn(items[idx])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker))
+  return results
+}
 
 function pageUrl(spaceKey, pageId) {
   return `${ATLASSIAN_BASE}/wiki/spaces/${spaceKey}/pages/${pageId}`
@@ -588,23 +608,22 @@ async function main() {
     if (excluded.length) console.log(`Excluded: ${excluded.map((s) => s.key).join(', ')}`)
   }
 
-  console.log(`Syncing ${spaces.length} spaces:\n`)
+  console.log(`Syncing ${spaces.length} spaces (${CONCURRENCY} parallel):\n`)
 
-  const stats = []
-  const issues = [] // shared across all spaces
-  let totalErrors = 0
+  const issues = [] // shared across all spaces — JS is single-threaded, no races
 
-  for (const space of spaces) {
+  const rawResults = await pMap(spaces, async (space) => {
     try {
-      const result = await syncSpace(space, syncedAt, issues)
-      stats.push(result)
-      totalErrors += result.errors
+      return await syncSpace(space, syncedAt, issues)
     } catch (err) {
       console.error(`  ✗  ${space.key}: ${err.message}`)
       issues.push({ space: space.key, title: space.name, pageId: '—', reason: `Space sync failed: ${err.message}` })
-      totalErrors++
+      return null
     }
-  }
+  }, CONCURRENCY)
+
+  const stats = rawResults.filter(Boolean)
+  const totalErrors = stats.reduce((n, s) => n + s.errors, 0) + rawResults.filter((r) => !r).length
 
   // Remove directories for spaces no longer in the sync set
   const syncedDirKeys = new Set(stats.map((s) => s.dirKey))
