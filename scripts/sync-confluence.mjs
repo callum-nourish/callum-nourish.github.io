@@ -222,7 +222,7 @@ function buildPathMap(pages) {
 
 // ── ADF → Markdown ────────────────────────────────────────────────────────────
 
-function adfToMarkdown(node, ctx = { listDepth: 0 }) {
+function adfToMarkdown(node, ctx = { listDepth: 0, mentions: new Set() }) {
   if (!node) return ''
 
   switch (node.type) {
@@ -338,7 +338,15 @@ function adfToMarkdown(node, ctx = { listDepth: 0 }) {
 
     case 'status':      return node.attrs?.text ?? ''
     case 'emoji':       return node.attrs?.text ?? node.attrs?.shortName ?? ''
-    case 'mention':     return '' // PII — strip all colleague name mentions
+    case 'mention': {
+      // Keep the display name as plain text; collect a person/ tag for navigation.
+      // The tag page lists every doc that mentions this person.
+      const raw = (node.attrs?.text ?? '').replace(/^@/, '').trim()
+      if (!raw) return ''
+      const tag = 'person/' + raw.toLowerCase().replace(/[^\w]+/g, '-').replace(/^-|-$/g, '')
+      ctx.mentions?.add(tag)
+      return raw
+    }
     case 'media':
     case 'mediaSingle':
     case 'mediaGroup':
@@ -365,14 +373,14 @@ function postProcess(md) {
 
 // ── File building ─────────────────────────────────────────────────────────────
 
-function buildPage(title, pageId, spaceKey, lastModified, mdBody) {
+function buildPage(title, pageId, spaceKey, lastModified, mdBody, mentions = []) {
   const updated = lastModified?.slice(0, 10) ?? null
+  const allTags = ['confluence', spaceKey.toLowerCase(), ...mentions].map((t) => `  - ${t}`)
   const fm = [
     '---',
     `title: "${title.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`,
     `tags:`,
-    `  - confluence`,
-    `  - ${spaceKey.toLowerCase()}`,
+    ...allTags,
     `confluenceId: ${pageId}`,
     ...(updated ? [`updated: ${updated}`] : []),
     '---',
@@ -530,9 +538,10 @@ async function syncSpace(space, syncedAt, issues) {
       if (status === 'archived') continue
 
       let mdBody = ''
+      const mentionCtx = { listDepth: 0, mentions: new Set() }
       if (adf) {
         try {
-          mdBody = postProcess(adfToMarkdown(adf))
+          mdBody = postProcess(adfToMarkdown(adf, mentionCtx))
         } catch (convErr) {
           issues.push({
             space: space.key,
@@ -551,7 +560,7 @@ async function syncSpace(space, syncedAt, issues) {
         })
       }
 
-      const content = buildPage(title || page.title, page.id, space.key, lastModified, mdBody)
+      const content = buildPage(title || page.title, page.id, space.key, lastModified, mdBody, [...mentionCtx.mentions])
 
       await mkdir(dirname(filePath), { recursive: true })
 

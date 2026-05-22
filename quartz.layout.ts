@@ -5,7 +5,8 @@ import * as Component from "./quartz/components"
 export const sharedPageComponents: SharedLayout = {
   head: Component.Head(),
   header: [],
-  afterBody: [],
+  // Tags render below the content on every page — navigation, not top-of-page metadata
+  afterBody: [Component.TagList()],
   footer: Component.Footer({
     links: {},
   }),
@@ -20,7 +21,6 @@ export const defaultContentPageLayout: PageLayout = {
     }),
     Component.ArticleTitle(),
     Component.ContentMeta(),
-    Component.TagList(),
   ],
   left: [
     Component.PageTitle(),
@@ -32,11 +32,9 @@ export const defaultContentPageLayout: PageLayout = {
           grow: true,
         },
         { Component: Component.Darkmode() },
-        { Component: Component.ReaderMode() },
-        { Component: Component.PaletteToggle() },
       ],
     }),
-    Component.Explorer({ folderDefaultState: "collapsed" }),
+    // No Explorer on content pages — use search, graph, and breadcrumbs instead
   ],
   right: [
     Component.Graph({
