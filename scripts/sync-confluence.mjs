@@ -153,8 +153,11 @@ async function fetchPageBody(pageId) {
 
 // ── Hierarchy: build a path map mirroring Confluence structure ─────────────────
 //
-// Each page is written as {spaceDir}/{ancestor-slug}/{slug}/index.md so the
-// filesystem tree matches what you see in the Confluence sidebar.
+// Parent pages (those with at least one child) → {path}/index.md  (Explorer folder)
+// Leaf pages (no children)                     → {path}.md        (Explorer file)
+//
+// This mirrors what you see in the Confluence sidebar while keeping the
+// Explorer readable: only real sections appear as expandable folders.
 
 function slugify(title) {
   return (
@@ -212,7 +215,9 @@ function buildPathMap(pages) {
   }
 
   assignPaths(roots, '')
-  return pathMap
+  // parentIds = every page that has at least one child in this space
+  const parentIds = new Set(children.keys())
+  return { pathMap, parentIds }
 }
 
 // ── ADF → Markdown ────────────────────────────────────────────────────────────
@@ -332,7 +337,7 @@ function adfToMarkdown(node, ctx = { listDepth: 0 }) {
     }
 
     case 'status':      return node.attrs?.text ?? ''
-    case 'emoji':       return node.attrs?.shortName ?? node.attrs?.text ?? ''
+    case 'emoji':       return node.attrs?.text ?? node.attrs?.shortName ?? ''
     case 'mention':     return '' // PII — strip all colleague name mentions
     case 'media':
     case 'mediaSingle':
@@ -497,7 +502,7 @@ async function syncSpace(space, syncedAt, issues) {
   const pages = await fetchAllPages(space.id)
 
   // 2. Build hierarchy-aware path map
-  const pathMap = buildPathMap(pages)
+  const { pathMap, parentIds } = buildPathMap(pages)
 
   // 3. Fetch bodies and write files
   const writtenPaths = new Set()
@@ -510,9 +515,12 @@ async function syncSpace(space, syncedAt, issues) {
     const relPath = pathMap.get(String(page.id))
     if (relPath === undefined) continue // shouldn't happen
 
-    // Each page is index.md inside its own slug directory
-    const pageDir = join(spaceDir, relPath)
-    const filePath = join(pageDir, 'index.md')
+    // Parent pages (have children) → {path}/index.md  — Explorer shows as folder
+    // Leaf pages (no children)     → {path}.md        — Explorer shows as file
+    const isParent = parentIds.has(String(page.id))
+    const filePath = isParent
+      ? join(spaceDir, relPath, 'index.md')
+      : join(spaceDir, relPath + '.md')
     writtenPaths.add(filePath)
 
     try {
@@ -545,7 +553,7 @@ async function syncSpace(space, syncedAt, issues) {
 
       const content = buildPage(title || page.title, page.id, space.key, lastModified, mdBody)
 
-      await mkdir(pageDir, { recursive: true })
+      await mkdir(dirname(filePath), { recursive: true })
 
       let existing = null
       try { existing = await readFile(filePath, 'utf-8') } catch { /* new */ }
