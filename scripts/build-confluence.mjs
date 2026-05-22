@@ -18,7 +18,12 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const CACHE_ROOT = join(__dirname, '..', '.confluence-cache')
 const CONTENT_ROOT = join(__dirname, '..', 'content', 'confluence')
+const CARDS_ROOT = join(__dirname, '..', 'content')
 const ATLASSIAN_BASE = 'https://nourishcare.atlassian.net'
+
+// Populated in main() — slugs of out-*.md / bp-*.md card files that exist in content/
+// Used to turn Jira smart links into wikilinks where the card page already exists.
+const KNOWN_CARDS = new Set()
 
 // ── Slugify ───────────────────────────────────────────────────────────────────
 
@@ -169,9 +174,16 @@ function adfToMarkdown(node, ctx = { listDepth: 0, mentions: new Set() }) {
     case 'tableCell':   return (node.content ?? []).map((n) => adfToMarkdown(n, ctx)).join('')
 
     case 'panel': {
-      const label = node.attrs?.panelType ?? 'note'
+      const panelType = node.attrs?.panelType ?? 'note'
       const inner = joinBlocks((node.content ?? []).map((n) => adfToMarkdown(n, ctx)))
-      return `> **${label.charAt(0).toUpperCase() + label.slice(1)}:** ${inner.trim()}\n`
+      // Standard Confluence panel types get a meaningful label.
+      // 'custom' panels are just formatted content — don't add a noisy "Custom:" prefix.
+      const LABELLED = new Set(['note', 'tip', 'warning', 'error', 'info', 'success'])
+      if (LABELLED.has(panelType)) {
+        const label = panelType.charAt(0).toUpperCase() + panelType.slice(1)
+        return `> **${label}:** ${inner.trim()}\n`
+      }
+      return inner.trim() + '\n'
     }
 
     case 'expand':
@@ -184,7 +196,16 @@ function adfToMarkdown(node, ctx = { listDepth: 0, mentions: new Set() }) {
     case 'inlineCard':
     case 'blockCard': {
       const url = node.attrs?.url ?? ''
-      return url ? `[${url}](${url})` : ''
+      if (!url) return ''
+      // Jira ticket URLs → [OUT-123](url), or [[out-123]] if the card exists locally
+      const jiraMatch = url.match(/\/browse\/([A-Za-z]+-\d+)/)
+      if (jiraMatch) {
+        const ticketId = jiraMatch[1]                     // e.g. "OUT-123"
+        const slug = ticketId.toLowerCase()               // e.g. "out-123"
+        if (KNOWN_CARDS.has(slug)) return `[[${slug}]]`  // wikilink → graph edge
+        return `[${ticketId}](${url})`                    // pretty label at minimum
+      }
+      return `[${url}](${url})`
     }
 
     case 'date': {
@@ -227,7 +248,43 @@ function joinBlocks(parts) {
 }
 
 function postProcess(md) {
-  return md.replace(/\n{3,}/g, '\n\n').trim()
+  // 1. Strip empty bullet / numbered list items (template placeholders like "- " with nothing)
+  md = md.replace(/^[ \t]*[-*][ \t]*\n/gm, '')
+  md = md.replace(/^[ \t]*\d+\.[ \t]*\n/gm, '')
+
+  // 2. Remove headings whose only following content (before the next heading or EOF)
+  //    is blank lines — i.e. empty sections left by stripping media/macros/bullets.
+  md = removeEmptyHeadings(md)
+
+  // 3. Collapse multiple consecutive horizontal rules into one
+  md = md.replace(/(\n---\n)(\s*---\n)+/g, '\n---\n')
+
+  // 4. Collapse 3+ blank lines → 2
+  md = md.replace(/\n{3,}/g, '\n\n')
+
+  return md.trim()
+}
+
+function removeEmptyHeadings(md) {
+  const lines = md.split('\n')
+  const out = []
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    if (/^#{1,6}\s+\S/.test(line)) {
+      // Scan ahead past blank lines to find the next non-blank line
+      let j = i + 1
+      while (j < lines.length && lines[j].trim() === '') j++
+      // If the next non-blank line is another heading or we hit EOF → empty section
+      if (j >= lines.length || /^#{1,6}\s/.test(lines[j])) {
+        i = j // skip this heading and the blanks after it
+        continue
+      }
+    }
+    out.push(line)
+    i++
+  }
+  return out.join('\n')
 }
 
 // ── File builders ─────────────────────────────────────────────────────────────
@@ -458,6 +515,15 @@ async function main() {
   }
 
   await mkdir(CONTENT_ROOT, { recursive: true })
+
+  // Build set of card slugs (out-123, bp-456) so Jira smart links become wikilinks
+  try {
+    const cardFiles = await readdir(CARDS_ROOT)
+    for (const f of cardFiles) {
+      if (/^(out|bp)-\d+\.md$/i.test(f)) KNOWN_CARDS.add(f.replace(/\.md$/, '').toLowerCase())
+    }
+    if (KNOWN_CARDS.size) console.log(`${KNOWN_CARDS.size} card pages found for wikilink resolution`)
+  } catch { /* content/ might not have cards yet */ }
 
   const syncedAt = new Date(manifest.syncedAt).toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
   console.log(`Building from cache (synced ${syncedAt})`)
